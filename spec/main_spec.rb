@@ -1,12 +1,119 @@
-require File.expand_path("code/fibonacci")
+# require File.expand_path("main")
 
-describe Fibonacci do
-  describe ".calculate" do
-    [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765].each_with_index do |value, index|
-      context "when n == #{index}" do
-        subject { Fibonacci.calculate(index) }
+describe PhoneNumberConverter do
+  describe ".find_variants" do
+    converter = PhoneNumberConverter.new
+    [
+      { 
+        number: '6686787825',
+        etalon: [
+          ["mot", "opt", "puck"],
+          ["mot", "opt", "ruck"],
+          ["mot", "opt", "suck"],
+          ["mot", "ort", "puck"],
+          ["mot", "ort", "ruck"],
+          ["mot", "ort", "suck"],
+          ["not", "opt", "puck"],
+          ["not", "opt", "ruck"],
+          ["not", "opt", "suck"],
+          ["not", "ort", "puck"],
+          ["not", "ort", "ruck"],
+          ["not", "ort", "suck"],
+          ["oot", "opt", "puck"],
+          ["oot", "opt", "ruck"],
+          ["oot", "opt", "suck"],
+          ["oot", "ort", "puck"],
+          ["oot", "ort", "ruck"],
+          ["oot", "ort", "suck"],
+          ["noun", "pup", "taj"],
+          ["noun", "pur", "taj"],
+          ["noun", "pus", "taj"],
+          ["noun", "sup", "taj"],
+          ["noun", "suq", "taj"],
+          ["onto", "pup", "taj"],
+          ["onto", "pur", "taj"],
+          ["onto", "pus", "taj"],
+          ["onto", "sup", "taj"],
+          ["onto", "suq", "taj"],
+          ["mot", "opts", "taj"],
+          ["mot", "opus", "taj"],
+          ["mot", "orts", "taj"],
+          ["not", "opts", "taj"],
+          ["not", "opus", "taj"],
+          ["not", "orts", "taj"],
+          ["oot", "opts", "taj"],
+          ["oot", "opus", "taj"],
+          ["oot", "orts", "taj"],
+          ["noun", "struck"],
+          ["onto", "struck"],
+          ["motor", "truck"],
+          ["motor", "usual"],
+          ["nouns", "truck"],
+          ["nouns", "usual"],
+          "motortruck"]
+      },
+      {
+        number: '2282668687',
+        etalon: [
+          ["act", "boo", "tots"],
+          ["act", "boo", "tour"],
+          ["act", "con", "tots"],
+          ["act", "con", "tour"],
+          ["act", "coo", "tots"],
+          ["act", "coo", "tour"],
+          ["bat", "boo", "tots"],
+          ["bat", "boo", "tour"],
+          ["bat", "con", "tots"],
+          ["bat", "con", "tour"],
+          ["bat", "coo", "tots"],
+          ["bat", "coo", "tour"],
+          ["cat", "boo", "tots"],
+          ["cat", "boo", "tour"],
+          ["cat", "con", "tots"],
+          ["cat", "con", "tour"],
+          ["cat", "coo", "tots"],
+          ["cat", "coo", "tour"],
+          ["acta", "mot", "mus"],
+          ["acta", "mot", "nus"],
+          ["acta", "mot", "our"],
+          ["acta", "not", "mus"],
+          ["acta", "not", "nus"],
+          ["acta", "not", "our"],
+          ["acta", "oot", "mus"],
+          ["acta", "oot", "nus"],
+          ["acta", "oot", "our"],
+          ["act", "boot", "mus"],
+          ["act", "boot", "nus"],
+          ["act", "boot", "our"],
+          ["act", "coot", "mus"],
+          ["act", "coot", "nus"],
+          ["act", "coot", "our"],
+          ["bat", "boot", "mus"],
+          ["bat", "boot", "nus"],
+          ["bat", "boot", "our"],
+          ["bat", "coot", "mus"],
+          ["bat", "coot", "nus"],
+          ["bat", "coot", "our"],
+          ["cat", "boot", "mus"],
+          ["cat", "boot", "nus"],
+          ["cat", "boot", "our"],
+          ["cat", "coot", "mus"],
+          ["cat", "coot", "nus"],
+          ["cat", "coot", "our"],
+          ["acta", "mounts"],
+          ["act", "amounts"],
+          ["act", "contour"],
+          ["bat", "amounts"],
+          ["bat", "contour"],
+          ["cat", "amounts"],
+          ["cat", "contour"],
+          "catamounts"]
+      }
+    ].each do |data|
+      context "when phone == #{data[:number]}" do
+        subject { converter.find_variants(data[:number]) }
 
-        it { is_expected.to eq value }
+        it { is_expected.to eq data[:etalon] }
       end
     end
   end

@@ -1,5 +1,6 @@
 DESC
 * there are 2 methods (find_variants - slow/silly 1.3s baseed on Postgres, find_variants2 - fast 0.3s based on redis )
+# Install Redis & fill it in by 'DictLoader.new.load_to_redis'
 
 TODO
 * all classes in one file - should be splitted be file per class/module

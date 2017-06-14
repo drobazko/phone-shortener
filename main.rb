@@ -6,7 +6,7 @@ require 'redis'
 
 module DictFiltrator
   def correct?(word)
-    (3..7).include?(word.length) || word.length == 10
+    [3,4,5,6,7,10].include?(word.length)
   end
 
   def correct_number?(number)
@@ -194,13 +194,13 @@ class PhoneNumberConverter
   end
 end
 
-phone = '6686787825'
+phone = '2282668687'
 
 # DictLoader.new.load_to_redis
 
 Benchmark.bm do |b|
   b.report 'Converter' do
-    # p PhoneNumberConverter.new.find_variants(phone, :pg)
+    p PhoneNumberConverter.new.find_variants(phone, :pg)
     p PhoneNumberConverter.new.find_variants(phone, :redis)
   end
 end
