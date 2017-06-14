@@ -2,6 +2,8 @@ require 'benchmark'
 require 'yaml'
 require 'pg'
 require 'deepmap'
+require 'redis'
+
 
 module DictFiltrator
   def correct?(word)
@@ -60,11 +62,24 @@ class DictLoader
       .select{|w| correct? w }
 
     @conn = PG.connect( dbname: 'grabber_development' )
+    @redis = Redis.new
+    @converter = PhoneNumberConverter.new
   end
 
   def load_to_db
     @conn.exec('DELETE FROM dict')
     @dict.each{|v| @conn.exec( "INSERT INTO dict (word) VALUES('#{v}')" ) } 
+  end
+
+  def load_to_redis
+    @dict.each{|word|
+      if @redis.get(@converter.word_to_digits(word))
+        @redis.set(@converter.word_to_digits(word), @redis.get(@converter.word_to_digits(word)) + '|' + word)
+        next
+      end
+
+      @redis.set(@converter.word_to_digits(word), word)
+    }
   end
 
   def load_to_arr
@@ -129,6 +144,11 @@ class PhoneNumberConverter
 
   def initialize
     @conn = PG.connect( dbname: 'grabber_development' )
+    @redis = Redis.new
+  end
+
+  def word_to_digits(word)
+    word.split('').map{|c| REVERSE_MAPPER[c]}.join
   end
 
   def find_variants(phone_number = '6686787825')
@@ -147,6 +167,18 @@ class PhoneNumberConverter
       .flat_map{ |v| v[0].product(*v[1..-1]) }
   end
 
+  def find_variants2(phone_number = '6686787825')
+    raise 'Phone number not allowed' unless correct_number?(phone_number)
+
+    NUMBER_SPLITTER
+      .map{ |pattern| phone_number.scan(/#{pattern}/).first }
+      .map { |numbers|
+        numbers.map{|n| next unless n; @redis.get(n).to_s.split('|')}
+      }
+      .flat_map{ |v| v[0].product(*v[1..-1]) }
+      .map{||}
+  end
+
   def check_variant_correctness(variants)
   end
 
@@ -161,13 +193,16 @@ class PhoneNumberConverter
     return if i > number.length - 1
     MAPPER[number[i]].each{|l| parse(number, holder, word + l, i + 1)}
   end
-
 end
 
 phone = '2282668687'
+# DictLoader.new.load_to_redis
 
-Benchmark.bm do |b|
-  b.report 'Converter' do
-    p PhoneNumberConverter.new.find_variants(phone)
-  end
-end
+p PhoneNumberConverter.new.find_variants(phone)
+puts "============"
+p PhoneNumberConverter.new.find_variants2(phone)
+
+# Benchmark.bm do |b|
+#   b.report 'Converter' do
+#   end
+# end
