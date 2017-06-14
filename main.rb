@@ -150,9 +150,17 @@ class PhoneNumberConverter
     word.split('').map{|c| REVERSE_MAPPER[c]}.join
   end
 
-  def find_variants(phone_number = '6686787825')
+  def find_variants(phone_number = '6686787825', type = :redis)
     raise 'Phone number not allowed' unless correct_number?(phone_number)
+    send("find_variants_#{type}", phone_number)
+      .flat_map{ |v| v[0].product(*v[1..-1]) }
+      .map{|v| v.count == 1 ? v[0] : v}
+      .deep_map{|v| v.downcase}
+  end
 
+  private
+
+  def find_variants_pg(phone_number)
     NUMBER_SPLITTER
       .map{ |pattern| phone_number.scan(/#{pattern}/).first }
       .map { |numbers|
@@ -163,10 +171,9 @@ class PhoneNumberConverter
         end
       }
       .map{ |v| v.flat_map(&:values) }
-      .flat_map{ |v| v[0].product(*v[1..-1]) }
   end
 
-  def find_variants2(phone_number = '6686787825')
+  def find_variants_redis(phone_number)
     raise 'Phone number not allowed' unless correct_number?(phone_number)
 
     NUMBER_SPLITTER
@@ -174,10 +181,7 @@ class PhoneNumberConverter
       .map { |numbers|
         numbers.map{|n| next unless n; @redis.get(n).to_s.split('|')}
       }
-      .flat_map{ |v| v[0].product(*v[1..-1]) }
   end
-
-  private
 
   def select_words_from_db(words)
     @conn.exec( "SELECT word FROM dict WHERE word in (#{words.map{|h| "'#{h}'"}.join(',')})" )
@@ -196,7 +200,7 @@ phone = '6686787825'
 
 Benchmark.bm do |b|
   b.report 'Converter' do
-    p PhoneNumberConverter.new.find_variants(phone)
-    p PhoneNumberConverter.new.find_variants2(phone)
+    # p PhoneNumberConverter.new.find_variants(phone, :pg)
+    p PhoneNumberConverter.new.find_variants(phone, :redis)
   end
 end
