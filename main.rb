@@ -72,12 +72,13 @@ class DictLoader
 
   def load_to_redis
     @dict.each{|word|
-      if @redis.get(@converter.word_to_digits(word))
-        @redis.set(@converter.word_to_digits(word), @redis.get(@converter.word_to_digits(word)) + '|' + word)
+      digits = @converter.word_to_digits(word)
+      if @redis.get(@digits)
+        @redis.set(@digits, @redis.get(@digits) + '|' + word)
         next
       end
 
-      @redis.set(@converter.word_to_digits(word), word)
+      @redis.set(@digits, word)
     }
   end
 
