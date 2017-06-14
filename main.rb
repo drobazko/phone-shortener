@@ -1,12 +1,20 @@
 require 'benchmark'
 require 'yaml'
 require 'pg'
+require 'deepmap'
 
 module DictFiltrator
   def correct?(word)
     (3..7).include?(word.length) || word.length == 10
   end
+
+  def correct_number?(number)
+    /^[1-9]{10}$/ =~ number
+  end
 end 
+
+module Persistance
+end
 
 class DictIndexator
   include DictFiltrator
@@ -46,13 +54,10 @@ class DictLoader
   include DictFiltrator
 
   def initialize(source_dict = 'dictionary.txt')
-    # p File.readlines(source_dict).map{|w| w.strip}.select{|w| w.length == 10 && ['M', 'N', 'O'].include?(w[0])}.count
-
     @dict = File
       .readlines(source_dict)
       .map{|w| w.strip}
-      .select{|w| correct?(w)}
-      # .map{|w| { w => w.split('').map{|l| PhoneNumberConverter::REVERSE_MAPPER[l]}.join }}
+      .select{|w| correct? w }
 
     @conn = PG.connect( dbname: 'grabber_development' )
   end
@@ -70,11 +75,17 @@ end
 class PhoneNumberConverter
   include DictFiltrator
 
-  def initialize
-    @dict = DictLoader.new.load_to_arr.group_by(&:length)
-    # @dict = DictLoader.new.load_to_arr
-    @conn = PG.connect( dbname: 'grabber_development' )
-  end
+  NUMBER_SPLITTER = [
+    '(\d{3})(\d{3})(\d{4})',
+    '(\d{4})(\d{3})(\d{3})',
+    '(\d{3})(\d{4})(\d{3})',
+    '(\d{6})(\d{4})',
+    '(\d{4})(\d{6})',
+    '(\d{7})(\d{3})',
+    '(\d{3})(\d{7})',  
+    '(\d{5})(\d{5})',
+    '(\d{10})'
+  ]
 
   MAPPER = {
     '2' => %w[A B C],
@@ -116,81 +127,74 @@ class PhoneNumberConverter
     'Z' => '9'
   }
 
+  def initialize
+    @conn = PG.connect( dbname: 'grabber_development' )
+  end
+
+  def find_variants(phone_number = '6686787825')
+    raise 'Phone number not allowed' unless correct_number?(phone_number)
+
+    NUMBER_SPLITTER
+      .map{ |pattern| phone_number.scan(/#{pattern}/).first }
+      .map { |numbers|
+        numbers.map do |number|
+          holder = []
+          parse(number, holder)
+          { number => select_words_from_db(holder).column_values(0) }
+        end
+      }
+      .map{ |v| v.flat_map(&:values) }
+      .flat_map{ |v| v[0].product(*v[1..-1]) }
+  end
+
+  def check_variant_correctness(variants)
+  end
+
+  private
+
+  def select_words_from_db(words)
+    @conn.exec( "SELECT word FROM dict WHERE word in (#{words.map{|h| "'#{h}'"}.join(',')})" )
+  end
+
   def parse(number, holder = [], word = '', i = 0)
-    # if correct?(word)
-    #   qwt = qwt_in_db(word)
-    #   if qwt.zero? 
-    #     holder << word
-    #     word = ''
-    #     return
-    #   end
-    # end
-
-    # if correct?(word) # && @dict[word.length].include?(word)
-      holder << word if correct?(word) && number.length == word.length
-      # p holder.object_id
-      # p i
-      # p word
-      # p holder
-      # word = ''
-    # end
-
-    # if correct?(word) 
-    #   if @dict[word.length].include?(word)
-    #     holder << word
-    #     word = ''
-    #   end
-    # end
-
+    holder << word if correct?(word) && number.length == word.length
     return if i > number.length - 1
     MAPPER[number[i]].each{|l| parse(number, holder, word + l, i + 1)}
   end
 
-  # def qwt_in_db(word)
-  #   @conn.exec("SELECT * FROM dict WHERE word like 'BABYS%'").getvalue(0,0).to_i
-  # end
 end
 
-phone = '6686787825'
+phone = '2282668687'
 
-# holder = []
-# PhoneNumberConverter.new.parse(phone, holder)
-# p holder
-
-# res = holder.map{|h| "'#{h}'"}.join(',')
-# puts res
-
-# conn = PG.connect( dbname: 'grabber_development' )
-# r = conn.exec( "SELECT word FROM dict WHERE word in (#{res})" )
-# p r.column_values(0)
+Benchmark.bm do |b|
+  b.report 'Converter' do
+    p PhoneNumberConverter.new.find_variants(phone)
+  end
+end
 
 
-patterns = [
-  '(\d{3})(\d{3})(\d{4})',
-  '(\d{4})(\d{3})(\d{3})',
-  '(\d{3})(\d{4})(\d{3})',
-  '(\d{6})(\d{4})',
-  '(\d{4})(\d{6})',
-  '(\d{7})(\d{3})',
-  '(\d{3})(\d{7})',  
-  '(\d{5})(\d{5})'
-]
 
-conn = PG.connect( dbname: 'grabber_development' )
 
-p patterns
-  .map{ |pattern| phone.scan(/#{pattern}/).first }
-  .map { |numbers|
-    numbers.map do |number|
-      holder = []
-      PhoneNumberConverter.new.parse(number, holder)
-      r = conn.exec( "SELECT word FROM dict WHERE word in (#{holder.map{|h| "'#{h}'"}.join(',')})" )
-      { number => r.column_values(0) }
-    end
-  }
-  .map{|v| v.flat_map(&:values)}
-  .flat_map{|v| v[0].product(*v[1..-1])}
-  
+
+
+
+
+
+# p variants
+# # reverse check
+# p variants
+# p variants
+#   .deep_map{|v| v.split('').map{|c| PhoneNumberConverter::REVERSE_MAPPER[c]}.join}
+#   .map(&:join)
+#   .uniq
+
+# variants = variants
+# p variants.flatten
+
+# p variants.flatten.count
+# p "SELECT count(*) FROM dict WHERE word in (#{variants.map{|h| "'#{h}'"}.join(',')})"
+# r = conn.exec( "SELECT count(*) FROM dict WHERE word in (#{variants.map{|h| "'#{h}'"}.join(',')})" )
+# p r.getvalue(0,0).to_i
 
   #[[{"668"=>["MOT", "NOT", "OOT"]}, {"678"=>["OPT", "ORT"]}, {"7825"=>["PUCK", "RUCK", "SUCK"]}], 
   #[{"6686"=>["NOUN", "ONTO"]}, {"787"=>["PUP", "PUR", "PUS", "SUP", "SUQ"]}, {"825"=>["TAJ"]}], 
@@ -231,64 +235,3 @@ p patterns
 # end
 
 # puts holder
-
-# DictLoader.new.load_to_db
-# @conn = PG.connect( dbname: 'grabber_development' )
-# @r = @conn.exec("SELECT COUNT(*) FROM dict WHERE word like 'AAH34%'")
-# p @r.getvalue(0,0).to_i
-
-# (1..5000).each{|v| @conn.exec("SELECT * FROM dict WHERE word like 'BABYS%'") }
-
-# @dict = DictLoader.new.load_to_arr
-# p @dict.last
-# # 76126
-# p @dict.count
-# p @dict.group_by(&:length)
-
-# p @dict.select{|d| d.length == 5}.count
-
-
-# 3 3 4
-# 4 3 3
-# 3 4 3
-# 5 5
-# 4 6
-# 6 4
-# 3 7
-# 7 3
-
-
-
-
-
-
-
-# dict = DictIndexator.new
-# puts dict.traverse
-# puts dict.save
-
-# PhoneNumberShortener.new
-
-# conn = PG.connect( dbname: 'grabber_development' )
-# conn.exec( "INSERT INTO dict (word) VALUES('first')" )
-
-# @dict = File
-#   .readlines('dictionary.txt')
-#   .map{|d| d.strip }
-#   .select{|d| ![1, 2, 8, 9].include?(d.length) && d.length <= 10}.count
-# puts @dict 
-
-# @dict = File
-#   .readlines('dictionary.txt')
-#   .map{|d| d.strip }
-#   .select{|d| ![1, 2, 8, 9].include?(d.length) && d.length <= 10}
-#   .each{|v| conn.exec( "INSERT INTO dict (word) VALUES('#{v}')" ) } 
-
-
-# Benchmark.bm do |b|
-#   dict = File.readlines('dictionary.txt')
-#   b.report 'Normal method' do
-#     dict.grep /UNSOUGHT/
-#   end
-# end
-
