@@ -4,7 +4,6 @@ require 'pg'
 require 'deepmap'
 require 'redis'
 
-
 module DictFiltrator
   def correct?(word)
     (3..7).include?(word.length) || word.length == 10
@@ -176,10 +175,6 @@ class PhoneNumberConverter
         numbers.map{|n| next unless n; @redis.get(n).to_s.split('|')}
       }
       .flat_map{ |v| v[0].product(*v[1..-1]) }
-      .map{||}
-  end
-
-  def check_variant_correctness(variants)
   end
 
   private
@@ -195,7 +190,7 @@ class PhoneNumberConverter
   end
 end
 
-phone = '2282668687'
+phone = '6686787825'
 
 # DictLoader.new.load_to_redis
 
