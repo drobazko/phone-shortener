@@ -46,9 +46,11 @@ class DictLoader
   include DictFiltrator
 
   def initialize(source_dict = 'dictionary.txt')
+    # p File.readlines(source_dict).map{|w| w.strip}.select{|w| w.length == 10 && ['M', 'N', 'O'].include?(w[0])}.count
+
     @dict = File
       .readlines(source_dict)
-      .map{|w| w.strip }
+      .map{|w| w.strip}
       .select{|w| correct?(w)}
       # .map{|w| { w => w.split('').map{|l| PhoneNumberConverter::REVERSE_MAPPER[l]}.join }}
 
@@ -69,8 +71,8 @@ class PhoneNumberConverter
   include DictFiltrator
 
   def initialize
-    # @dict = DictLoader.new.load_to_arr.group_by(&:length)
-    @dict = DictLoader.new.load_to_arr
+    @dict = DictLoader.new.load_to_arr.group_by(&:length)
+    # @dict = DictLoader.new.load_to_arr
     @conn = PG.connect( dbname: 'grabber_development' )
   end
 
@@ -114,29 +116,121 @@ class PhoneNumberConverter
     'Z' => '9'
   }
 
-  def parse(number, holder, word = '', i = 0)
-    if correct?(word) 
-      qwt = qwt_in_db(word)
-      if qwt.zero? 
-        holder << word
-        word = ''
-        return
-      end
-    end
+  def parse(number, holder = [], word = '', i = 0)
+    # if correct?(word)
+    #   qwt = qwt_in_db(word)
+    #   if qwt.zero? 
+    #     holder << word
+    #     word = ''
+    #     return
+    #   end
+    # end
 
-    # holder << word if  #and @dict[word.length].include?(word.upcase)
+    # if correct?(word) # && @dict[word.length].include?(word)
+      holder << word if correct?(word) && number.length == word.length
+      # p holder.object_id
+      # p i
+      # p word
+      # p holder
+      # word = ''
+    # end
+
+    # if correct?(word) 
+    #   if @dict[word.length].include?(word)
+    #     holder << word
+    #     word = ''
+    #   end
+    # end
+
     return if i > number.length - 1
     MAPPER[number[i]].each{|l| parse(number, holder, word + l, i + 1)}
   end
 
-  def qwt_in_db(word)
-    @conn.exec("SELECT * FROM dict WHERE word like 'BABYS%'").getvalue(0,0).to_i
-  end
+  # def qwt_in_db(word)
+  #   @conn.exec("SELECT * FROM dict WHERE word like 'BABYS%'").getvalue(0,0).to_i
+  # end
 end
 
-holder = []
-PhoneNumberConverter.new.parse('6686787825', holder)
-puts holder
+phone = '6686787825'
+
+# holder = []
+# PhoneNumberConverter.new.parse(phone, holder)
+# p holder
+
+# res = holder.map{|h| "'#{h}'"}.join(',')
+# puts res
+
+# conn = PG.connect( dbname: 'grabber_development' )
+# r = conn.exec( "SELECT word FROM dict WHERE word in (#{res})" )
+# p r.column_values(0)
+
+
+patterns = [
+  '(\d{3})(\d{3})(\d{4})',
+  '(\d{4})(\d{3})(\d{3})',
+  '(\d{3})(\d{4})(\d{3})',
+  '(\d{6})(\d{4})',
+  '(\d{4})(\d{6})',
+  '(\d{7})(\d{3})',
+  '(\d{3})(\d{7})',  
+  '(\d{5})(\d{5})'
+]
+
+conn = PG.connect( dbname: 'grabber_development' )
+
+p patterns
+  .map{ |pattern| phone.scan(/#{pattern}/).first }
+  .map { |numbers|
+    numbers.map do |number|
+      holder = []
+      PhoneNumberConverter.new.parse(number, holder)
+      r = conn.exec( "SELECT word FROM dict WHERE word in (#{holder.map{|h| "'#{h}'"}.join(',')})" )
+      { number => r.column_values(0) }
+    end
+  }
+  .map{|v| v.flat_map(&:values)}
+  .flat_map{|v| v[0].product(*v[1..-1])}
+  
+
+  #[[{"668"=>["MOT", "NOT", "OOT"]}, {"678"=>["OPT", "ORT"]}, {"7825"=>["PUCK", "RUCK", "SUCK"]}], 
+  #[{"6686"=>["NOUN", "ONTO"]}, {"787"=>["PUP", "PUR", "PUS", "SUP", "SUQ"]}, {"825"=>["TAJ"]}], 
+  # [{"668"=>["MOT", "NOT", "OOT"]}, {"6787"=>["OPTS", "OPUS", "ORTS"]}, {"825"=>["TAJ"]}], 
+  # [{"668678"=>[]}, {"7825"=>["PUCK", "RUCK", "SUCK"]}], 
+  # [{"6686"=>["NOUN", "ONTO"]}, {"787825"=>["STRUCK"]}], 
+  # [{"6686787"=>[]}, {"825"=>["TAJ"]}], 
+  # [{"668"=>["MOT", "NOT", "OOT"]}, {"6787825"=>[]}], 
+  # [{"66867"=>["MOTOR", "NOUNS"]}, {"87825"=>["TRUCK", "USUAL"]}]]
+
+
+  # .map{|v| v.flat_map(&:values)}
+  # .map{|v| v[0].product(*v[1..-1]).map(&:join)}
+ # t = [
+ #      [["MOT", "NOT", "OOT"], ["OPT", "ORT"], ["PUCK", "RUCK", "SUCK"]], 
+ #      [["NOUN", "ONTO"], ["PUP", "PUR", "PUS", "SUP", "SUQ"], ["TAJ"]], 
+ #      [["MOT", "NOT", "OOT"], ["OPTS", "OPUS", "ORTS"], ["TAJ"]], 
+ #      [[], ["PUCK", "RUCK", "SUCK"]], 
+ #      [["NOUN", "ONTO"], ["STRUCK"]], [[], ["TAJ"]], [["MOT", "NOT", "OOT"], []], [["MOTOR", "NOUNS"], ["TRUCK", "USUAL"]]]
+
+
+# t = [{"668"=>["MOT", "NOT", "OOT"]}, {"678"=>["OPT", "ORT"]}, {"7825"=>["PUCK", "RUCK", "SUCK"]}] 
+# c = t.flat_map(&:values)
+# c = [["MOT", "NOT", "OOT"], ["OPT", "ORT"], ["PUCK", "RUCK", "SUCK"]]
+# p c
+# p '============='
+# holder = []
+# p c[0].product(*c[1..-1]).map(&:join)
+# conn = PG.connect( dbname: 'grabber_development' )
+# r = conn.exec( "SELECT word FROM dict WHERE word in (#{res})" )
+# p r.column_values(0)
+
+# Benchmark.bm do |b|
+#   b.report 'Normal method' do
+#     holder = []
+#     PhoneNumberConverter.new.parse('6686787825', holder)
+#   end
+# end
+
+# puts holder
 
 # DictLoader.new.load_to_db
 # @conn = PG.connect( dbname: 'grabber_development' )
