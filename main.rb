@@ -196,13 +196,12 @@ class PhoneNumberConverter
 end
 
 phone = '2282668687'
+
 # DictLoader.new.load_to_redis
 
-p PhoneNumberConverter.new.find_variants(phone)
-puts "============"
-p PhoneNumberConverter.new.find_variants2(phone)
-
-# Benchmark.bm do |b|
-#   b.report 'Converter' do
-#   end
-# end
+Benchmark.bm do |b|
+  b.report 'Converter' do
+    p PhoneNumberConverter.new.find_variants(phone)
+    p PhoneNumberConverter.new.find_variants2(phone)
+  end
+end
