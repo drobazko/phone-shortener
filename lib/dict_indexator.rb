@@ -1,9 +1,11 @@
+require 'yaml'
+require_relative 'dict_filtrator'
+
 class DictIndexator
   include DictFiltrator
   attr_accessor :indexed_dict
 
   def initialize
-    @dict = filter_dict
     @indexed_dict = {}
   end
 
@@ -27,7 +29,7 @@ class DictIndexator
     @indexed_dict = @dict.inject({}){|memo, word| string_traverse(word, memo)};nil
   end
 
-  def save(indexed_dict = 'indexed-dictionary.txt')
+  def save(indexed_dict = '../indexed-dictionary.txt')
     File.open(indexed_dict, 'w') { |f| f.puts @indexed_dict.to_yaml }
   end
 end

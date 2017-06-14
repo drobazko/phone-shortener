@@ -1,8 +1,5 @@
-require 'benchmark'
-require 'yaml'
-require 'pg'
 require 'deepmap'
-require 'redis'
+require_relative 'lib/dict_filtrator'
 
 class PhoneNumberConverter
   include DictFiltrator
@@ -59,18 +56,19 @@ class PhoneNumberConverter
     'Z' => '9'
   }
 
-  def initialize
-    @conn = PG.connect( dbname: 'grabber_development' )
-    @redis = Redis.new
+  def initialize(client)
+    @client = client
   end
 
   def word_to_digits(word)
     word.split('').map{|c| REVERSE_MAPPER[c]}.join
   end
 
-  def find_variants(phone_number = '6686787825', type = :redis)
+  def find_variants(phone_number = '6686787825')
     raise 'Phone number not allowed' unless correct_number?(phone_number)
-    send("find_variants_#{type}", phone_number)
+    raise 'Only :pg, :redis db types allowed' unless [:pg, :redis].include? @client.class::TYPE
+
+    send("find_variants_#{@client.class::TYPE}", phone_number)
       .flat_map{ |v| v[0].product(*v[1..-1]) }
       .map{|v| v.count == 1 ? v[0] : v}
       .deep_map{|v| v.downcase}
@@ -85,24 +83,18 @@ class PhoneNumberConverter
         numbers.map do |number|
           holder = []
           parse(number, holder)
-          { number => select_words_from_db(holder).column_values(0) }
+          { number => @client.find_words(holder).column_values(0) }
         end
       }
       .map{ |v| v.flat_map(&:values) }
   end
 
   def find_variants_redis(phone_number)
-    raise 'Phone number not allowed' unless correct_number?(phone_number)
-
     NUMBER_SPLITTER
       .map{ |pattern| phone_number.scan(/#{pattern}/).first }
       .map { |numbers|
-        numbers.map{|n| next unless n; @redis.get(n).to_s.split('|')}
+        numbers.map{|n| next unless n; @client.connect.get(n).to_s.split('|')}
       }
-  end
-
-  def select_words_from_db(words)
-    @conn.exec( "SELECT word FROM dict WHERE word in (#{words.map{|h| "'#{h}'"}.join(',')})" )
   end
 
   def parse(number, holder = [], word = '', i = 0)
@@ -112,13 +104,3 @@ class PhoneNumberConverter
   end
 end
 
-phone = '2282668687'
-
-# DictLoader.new.load_to_redis
-
-Benchmark.bm do |b|
-  b.report 'Converter' do
-    p PhoneNumberConverter.new.find_variants(phone, :pg)
-    p PhoneNumberConverter.new.find_variants(phone, :redis)
-  end
-end
