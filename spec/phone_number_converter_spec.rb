@@ -1,13 +1,13 @@
-# require File.expand_path("main")
+require_relative '../phone_number_converter'
+require_relative '../lib/redis_client'
 
 describe PhoneNumberConverter do
   describe ".find_variants" do
-    converter = PhoneNumberConverter.new
+    converter = PhoneNumberConverter.new(RedisClient.new)
     [
       { 
         number: '6686787825',
         etalon: [
-          ["mot", "opt", "puck"],
           ["mot", "opt", "ruck"],
           ["mot", "opt", "suck"],
           ["mot", "ort", "puck"],
