@@ -79,11 +79,7 @@ class PhoneNumberConverter
       .deep_map{|v| v.downcase}
   end
 
-  # def parse(number, holder = [], word = '', i = 0)
-  #   holder += [word] if correct?(word) && number.length == word.length
-  #   return if i > number.length - 1
-  #   DIGITS_TO_CHAR_MAPPER[number[i]].each{|l| parse(number, holder, word + l, i + 1)}
-  # end
+  private
 
   def parse(number, holder = [], word = '', i = 0)
     holder << word if correct?(word) && number.length == word.length
@@ -93,8 +89,6 @@ class PhoneNumberConverter
     end
     holder
   end
-
-  private
 
   def find_variants_pg(phone_number)
     NUMBER_SPLITTER
