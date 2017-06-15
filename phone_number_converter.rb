@@ -84,9 +84,7 @@ class PhoneNumberConverter
   def parse(number, holder = [], word = '', i = 0)
     holder << word if correct?(word) && number.length == word.length
     return holder if i > number.length - 1
-    DIGITS_TO_CHAR_MAPPER[number[i]].each do |l|
-      parse(number, holder, word + l, i + 1)
-    end
+    DIGITS_TO_CHAR_MAPPER[number[i]].each { |l| parse(number, holder, word + l, i + 1) } 
     holder
   end
 
