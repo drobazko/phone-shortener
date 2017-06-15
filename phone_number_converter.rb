@@ -3,6 +3,12 @@ require_relative 'lib/dict_filtrator'
 
 class PhoneNumberConverter
   include DictFiltrator
+  
+  class IncorrectPhoneNumberError < StandardError
+    def initialize(msg = 'Incorrect phone number format - should be 10 digits excluding 0 and 1')
+      super
+    end
+  end
 
   NUMBER_SPLITTER = [
     '(\d{3})(\d{3})(\d{4})',
@@ -65,8 +71,7 @@ class PhoneNumberConverter
   end
 
   def find_variants(phone_number = '6686787825')
-    raise 'Phone number not allowed' unless correct_number?(phone_number)
-    raise 'Only :pg, :redis db types allowed' unless [:pg, :redis].include? @client.class::TYPE
+    correct_number?(phone_number) || raise(IncorrectPhoneNumberError)
 
     send("find_variants_#{@client.class::TYPE}", phone_number)
       .flat_map{ |v| v[0].product(*v[1..-1]) }
