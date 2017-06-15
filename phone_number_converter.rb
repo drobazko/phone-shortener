@@ -22,7 +22,7 @@ class PhoneNumberConverter
     '(\d{10})'
   ]
 
-  MAPPER = {
+  DIGITS_TO_CHAR_MAPPER = {
     '2' => %w[A B C],
     '3' => %w[D E F],
     '4' => %w[G H I],
@@ -79,19 +79,27 @@ class PhoneNumberConverter
       .deep_map{|v| v.downcase}
   end
 
+  # def parse(number, holder = [], word = '', i = 0)
+  #   holder += [word] if correct?(word) && number.length == word.length
+  #   return if i > number.length - 1
+  #   DIGITS_TO_CHAR_MAPPER[number[i]].each{|l| parse(number, holder, word + l, i + 1)}
+  # end
+
+  def parse(number, holder = [], word = '', i = 0)
+    holder << word if correct?(word) && number.length == word.length
+    return holder if i > number.length - 1
+    DIGITS_TO_CHAR_MAPPER[number[i]].each do |l|
+      parse(number, holder, word + l, i + 1)
+    end
+    holder
+  end
+
   private
 
   def find_variants_pg(phone_number)
     NUMBER_SPLITTER
-      .map{ |pattern| phone_number.scan(/#{pattern}/).first }
-      .map { |numbers|
-        numbers.map do |number|
-          holder = []
-          parse(number, holder)
-          { number => @client.find_words(holder).column_values(0) }
-        end
-      }
-      .map{ |v| v.flat_map(&:values) }
+      .map { |pattern| phone_number.scan(/#{pattern}/).first }
+      .deep_map { |number| @client.find_words(parse(number)).column_values(0) }
   end
 
   def find_variants_redis(phone_number)
@@ -101,11 +109,4 @@ class PhoneNumberConverter
         numbers.map{|n| next unless n; @client.connect.get(n).to_s.split('|')}
       }
   end
-
-  def parse(number, holder = [], word = '', i = 0)
-    holder << word if correct?(word) && number.length == word.length
-    return if i > number.length - 1
-    MAPPER[number[i]].each{|l| parse(number, holder, word + l, i + 1)}
-  end
 end
-
