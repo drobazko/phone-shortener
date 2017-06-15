@@ -99,8 +99,6 @@ class PhoneNumberConverter
   def find_variants_redis(phone_number)
     NUMBER_SPLITTER
       .map{ |pattern| phone_number.scan(/#{pattern}/).first }
-      .map { |numbers|
-        numbers.map{|n| next unless n; @client.connect.get(n).to_s.split('|')}
-      }
+      .deep_map { |number| next unless number; @client.connect.get(number).to_s.split('|') }
   end
 end
